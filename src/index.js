@@ -18,27 +18,44 @@ const commandFolders = fs.readdirSync(foldersPath);
 client.cooldowns = new Collection();
 client.commands = new Collection();
 
-for (const folder of commandFolders) {
-  const commandsPath = path.join(foldersPath, folder);
-  const commandFiles = fs
-    .readdirSync(commandsPath)
-    .filter((file) => file.endsWith(".js"));
-  for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    if ("data" in command && "execute" in command) {
-      client.commands.set(command.data.name, command);
-    } else {
-      console.log(
-        `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
-      );
-    }
+const declare_slash_commands = () => {
+  for (const folder of commandFolders) {
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs
+      .readdirSync(commandsPath)
+      .filter((file) => file.endsWith(".js"));
+    client.guilds.cache.forEach(async (guild) => {
+      // clear slash commands
+      await guild.commands.set([]);
+
+      // register new slash commands
+      for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ("data" in command && "execute" in command) {
+          client.commands.set(command.data.name, command);
+          if (command?.guild_id && guild.id !== command?.guild_id) {
+            return;
+          } else {
+            try {
+              await guild.commands.create(command.data);
+            } catch (error) {
+              console.error(error);
+            }
+          }
+        } else {
+          console.log(
+            `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+          );
+        }
+      }
+    });
   }
-}
+};
 
-console.log(client.commands);
-
-client.once(Events.ClientReady, (e) => {
+client.once(Events.ClientReady, async (e) => {
+  console.log(`declare slash commands is running!`);
+  await declare_slash_commands(); // register slash commands
   console.log(`${e.user.tag} is online!`);
 });
 
